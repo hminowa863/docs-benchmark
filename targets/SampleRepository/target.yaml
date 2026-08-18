@@ -1,0 +1,17 @@
+# Replace the refs and repository path with the repository under evaluation.
+name: SampleRepository
+repository: ../SampleRepository
+code_ref: main
+docs:
+  paths:
+    - AGENTS.md
+    - README.md
+    - docs/**
+variants:
+  - name: no-docs
+    type: remove
+  - name: current-docs
+    type: git
+    ref: main
+  - name: working-tree
+    type: working_tree

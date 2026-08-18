@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "docsbench"
+version = "0.1.0"
+description = "Benchmark how repository documentation affects coding-agent investigation."
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = ["PyYAML>=6.0"]
+
+[project.scripts]
+docsbench = "docsbench.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/docsbench"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

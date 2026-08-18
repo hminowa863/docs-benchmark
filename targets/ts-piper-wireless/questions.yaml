@@ -1,0 +1,40 @@
+questions:
+  - id: TSPW-001
+    category: invariant
+    question: emergency stopが無効化されている理由は何ですか？
+
+  - id: TSPW-002
+    category: procedure
+    question: Leader機の実行手順を教えてください。
+
+  - id: TSPW-003
+    category: fact
+    question: 送信周期はどこから設定できますか？
+
+  - id: TSPW-004
+    category: architecture
+    question: LeaderとFollower間の通信プロトコルは何ですか？
+
+  - id: TSPW-005
+    category: behavior
+    question: 起動時にFollower側のアームはどのように動作しますか？
+
+  - id: TSPW-006
+    category: architecture
+    question: テストはどのように設計されていますか？
+
+  - id: TSPW-007
+    category: behavior
+    question: 範囲外の角度を受信したら、どのように処理されますか？
+
+  - id: TSPW-008
+    category: fact
+    question: 遅延はどのように測定されますか？
+
+  - id: TSPW-009
+    category: invariant
+    question: ADRを書き込む基準は何ですか？
+
+  - id: TSPW-010
+    category: architecture
+    question: UIはどのように設計されていますか？

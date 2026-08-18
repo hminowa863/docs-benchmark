@@ -1,0 +1,23 @@
+name: ts-piper-wireless
+repository: ../ts-piper-wireless
+# コードは変更後の baseline に固定し、下記 variants で docs だけを比較する。
+code_ref: f6688c2
+docs:
+  paths:
+    - AGENTS.md
+    - README.md
+    - docs/**
+variants:
+  - name: no-docs
+    type: remove
+
+  - name: before-docs
+    type: git
+    ref: 69791c3ac62f12691fd6fbac120a4fb567591816
+
+  - name: after-docs
+    type: git
+    ref: f6688c2
+
+  - name: working-tree
+    type: working_tree
