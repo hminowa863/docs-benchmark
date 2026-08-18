@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .base import AgentAdapter, AgentResult, ToolCall
 
@@ -15,9 +15,11 @@ class CodexAdapter(AgentAdapter):
 
     name = "codex"
 
-    def __init__(self, executable: str = "codex", model: str | None = None) -> None:
+    def __init__(self, executable: str = "codex", model: str | None = None,
+                 on_progress: Callable[[str], None] | None = None) -> None:
         self.executable = executable
         self.model = model
+        self.on_progress = on_progress
 
     def run(self, workspace: Path, prompt: str) -> AgentResult:
         if not shutil.which(self.executable):
@@ -27,19 +29,47 @@ class CodexAdapter(AgentAdapter):
             command.extend(["--model", self.model])
         command.append(prompt)
         started = time.monotonic()
-        completed = subprocess.run(command, cwd=workspace, text=True, capture_output=True, check=False)
+        process = subprocess.Popen(
+            command, cwd=workspace, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1,
+        )
+        lines: list[str] = []
+        assert process.stdout is not None
+        try:
+            for line in process.stdout:
+                lines.append(line)
+                self._report_event(line)
+            return_code = process.wait()
+        except BaseException:
+            process.terminate()
+            process.wait()
+            raise
         elapsed = time.monotonic() - started
-        raw_log = completed.stdout + ("\nSTDERR:\n" + completed.stderr if completed.stderr else "")
-        if completed.returncode:
-            raise RuntimeError(f"Codex exited with {completed.returncode}: {completed.stderr.strip()}")
-        answer, usage, tool_calls = self._parse_jsonl(completed.stdout)
+        raw_log = "".join(lines)
+        if return_code:
+            raise RuntimeError(f"Codex exited with {return_code}. See the run log for details.\n{raw_log[-2000:]}")
+        answer, usage, tool_calls = self._parse_jsonl(raw_log)
         return AgentResult(answer=answer, input_tokens=usage.get("input_tokens"),
                            output_tokens=usage.get("output_tokens"), tool_calls=tuple(tool_calls),
                            elapsed_seconds=elapsed, raw_log=raw_log, agent_version=self._version(), model=self.model)
 
     def _version(self) -> str | None:
-        completed = subprocess.run([self.executable, "--version"], text=True, capture_output=True, check=False)
+        completed = subprocess.run([self.executable, "--version"], text=True, capture_output=True,
+                                   encoding="utf-8", errors="replace", check=False)
         return completed.stdout.strip() or None
+
+    def _report_event(self, line: str) -> None:
+        if self.on_progress is None:
+            return
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            return
+        item = event.get("item", {}) if isinstance(event.get("item"), dict) else {}
+        if event.get("type") == "item.completed" and item.get("type") == "command_execution":
+            self.on_progress(f"  Agent command: {item.get('command', '')}")
+        elif event.get("type") == "turn.started":
+            self.on_progress("  Agent is investigating…")
 
     @staticmethod
     def _parse_jsonl(raw_log: str) -> tuple[str, dict[str, int | None], list[ToolCall]]:

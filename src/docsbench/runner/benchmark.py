@@ -5,6 +5,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 from docsbench.agents.base import AgentAdapter
 from docsbench.config import DocsVariant, Target, load_questions
@@ -16,13 +17,15 @@ from .workspace import Workspace
 
 class BenchmarkRunner:
     def __init__(self, target: Target, questions_path: Path, output_root: Path, agent: AgentAdapter,
-                 keep_workspaces: bool = False, rubric_judge: AgentAdapter | None = None) -> None:
+                 keep_workspaces: bool = False, rubric_judge: AgentAdapter | None = None,
+                 on_progress: Callable[[str], None] | None = None) -> None:
         self.target = target
         self.questions_path = questions_path
         self.output_root = output_root / target.name
         self.agent = agent
         self.keep_workspaces = keep_workspaces
         self.rubric_judge = rubric_judge
+        self.on_progress = on_progress
         self.repository = GitRepository(target.repository)
 
     def run(self, variants: tuple[DocsVariant, ...], question_ids: set[str] | None = None,
@@ -42,6 +45,8 @@ class BenchmarkRunner:
         for variant in variants:
             for repeat_index in range(repeats):
                 for question in questions:
+                    if self.on_progress:
+                        self.on_progress(f"Running [{variant.name}] {question.id} (repeat {repeat_index + 1}/{repeats})…")
                     workspace = Workspace.create(self.repository, code_commit, self.keep_workspaces)
                     try:
                         docs_commit = apply_docs_overlay(self.repository, workspace.repo, code_commit,
@@ -78,4 +83,6 @@ class BenchmarkRunner:
                     json_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
                     (destination / f"{run_id}.log").write_text(raw_log, encoding="utf-8")
                     output_paths.append(json_path)
+                    if self.on_progress:
+                        self.on_progress(f"  Saved: {json_path}")
         return output_paths

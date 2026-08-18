@@ -46,10 +46,13 @@ def main(argv: list[str] | None = None) -> int:
     target_path = args.targets_dir / args.target / "target.yaml"
     target = load_target(target_path)
     variants = _select_variants(target.variants, args.variants, args.docs)
-    agent = MockAdapter() if args.agent == "mock" else CodexAdapter(model=args.model)
-    rubric_judge = CodexAdapter(model=args.rubric_model) if args.rubric_agent == "codex" else None
+    def progress(message: str) -> None:
+        print(message, flush=True)
+
+    agent = MockAdapter() if args.agent == "mock" else CodexAdapter(model=args.model, on_progress=progress)
+    rubric_judge = CodexAdapter(model=args.rubric_model, on_progress=progress) if args.rubric_agent == "codex" else None
     runner = BenchmarkRunner(target, target_path.with_name("questions.yaml"), args.results_dir, agent,
-                             keep_workspaces=args.keep_workspaces, rubric_judge=rubric_judge)
+                             keep_workspaces=args.keep_workspaces, rubric_judge=rubric_judge, on_progress=progress)
     paths = runner.run(variants, set(args.questions or []), args.repeat, args.code)
     print(f"Completed {len(paths)} run(s); results: {args.results_dir / target.name / 'runs'}")
     return 0
