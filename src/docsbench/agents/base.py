@@ -9,6 +9,7 @@ class ToolCall:
     type: str
     command: str | None = None
     files: tuple[str, ...] = ()
+    output_chars: int = 0
 
 
 @dataclass(frozen=True)
@@ -16,6 +17,7 @@ class AgentResult:
     answer: str
     input_tokens: int | None
     output_tokens: int | None
+    cached_input_tokens: int | None = None
     tool_calls: tuple[ToolCall, ...] = ()
     elapsed_seconds: float = 0.0
     raw_log: str = ""

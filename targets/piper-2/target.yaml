@@ -1,7 +1,7 @@
 name: ts-piper-wireless
 repository: ../ts-piper-wireless
 # コードは変更後の baseline に固定し、下記 variants で docs だけを比較する。
-code_ref: f6688c2
+code_ref: b7ea273fd0a9fc500fceb6dea20a2e06c0a255e4
 docs:
   paths:
     - AGENTS.md
@@ -11,25 +11,19 @@ docs:
 variants:
   - name: no-docs
     type: remove
-    ref: f6688c2
+    ref: 28cf69415ed21c7a5331fd9c6c278e404f4e3199
 
   - name: before-docs
     type: git
-    ref: 69791c3ac62f12691fd6fbac120a4fb567591816
+    ref: b7ea273fd0a9fc500fceb6dea20a2e06c0a255e4
 
   - name: after-docs
     type: git
-    ref: f6688c2
-
-  - name: working-tree
-    type: working_tree
+    ref: 28cf69415ed21c7a5331fd9c6c278e404f4e3199
+    scope: repository
 
   - name: codegraph
     type: remove
-    ref: f6688c2
+    ref: 28cf69415ed21c7a5331fd9c6c278e404f4e3199
     codegraph:
       init: true
-
-  - name: after-docs-no-codegraph
-    type: git
-    ref: f6688c2

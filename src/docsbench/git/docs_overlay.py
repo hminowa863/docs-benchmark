@@ -15,6 +15,8 @@ def selected_files(files: tuple[str, ...], patterns: tuple[str, ...]) -> set[str
 def apply_docs_overlay(repository: GitRepository, workspace: Path, code_ref: str,
                        patterns: tuple[str, ...], variant: DocsVariant) -> str | None:
     code_files = selected_files(repository.files_at(code_ref), patterns)
+    if variant.type == "baseline":
+        return code_ref
     if variant.type == "remove":
         _remove(workspace, code_files)
         return None
@@ -43,6 +45,8 @@ def apply_submodule_docs_overlays(repository: GitRepository, source_root: Path, 
     submodule pointers remain at the fixed code revision.
     """
     code_submodules = repository.submodule_commits(workspace)
+    if variant.type == "baseline":
+        return dict(code_submodules)
     if not code_submodules:
         return {}
     applicable = {path: commit for path, commit in code_submodules.items() if _submodule_patterns(path, patterns)}

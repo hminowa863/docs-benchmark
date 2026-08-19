@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import os
+import json
 import shutil
 import subprocess
 from pathlib import Path
 
-from docsbench.config import DocsVariant
+from docsbench.agents.base import AgentAdapter, AgentResult
+from docsbench.config import DocsVariant, Target
 from docsbench.git.docs_overlay import apply_docs_overlay, apply_submodule_docs_overlays
 from docsbench.git.repository import GitRepository
+from docsbench.runner.benchmark import BenchmarkRunner
 from docsbench.runner.workspace import Workspace
+import docsbench.runner.workspace as workspace_module
 
 
 def git(path: Path, *arguments: str) -> str:
@@ -71,6 +75,37 @@ def test_remove_overlay_removes_selected_docs(tmp_path: Path) -> None:
         workspace.close()
 
 
+def test_repository_scope_uses_the_requested_commit_for_the_whole_worktree(tmp_path: Path) -> None:
+    repo_path = tmp_path / "target"
+    repo_path.mkdir()
+    git(repo_path, "init")
+    (repo_path / "README.md").write_text("old docs", encoding="utf-8")
+    (repo_path / "app.py").write_text("version = 'old'", encoding="utf-8")
+    old_ref = commit(repo_path, "old")
+    (repo_path / "README.md").write_text("new docs", encoding="utf-8")
+    (repo_path / "app.py").write_text("version = 'new'", encoding="utf-8")
+    new_ref = commit(repo_path, "new")
+
+    class InspectingAgent(AgentAdapter):
+        name = "inspect"
+
+        def run(self, workspace: Path, prompt: str) -> AgentResult:
+            assert (workspace / "README.md").read_text(encoding="utf-8") == "old docs"
+            assert (workspace / "app.py").read_text(encoding="utf-8") == "version = 'old'"
+            return AgentResult(answer="ok", input_tokens=0, output_tokens=0)
+
+    questions_path = tmp_path / "questions.yaml"
+    questions_path.write_text("questions:\n  - id: Q-1\n    question: Which version?\n", encoding="utf-8")
+    target = Target("Example", repo_path, new_ref, ("README.md",), (), tmp_path / "target.yaml")
+    runner = BenchmarkRunner(target, questions_path, tmp_path / "results", InspectingAgent())
+
+    paths = runner.run((DocsVariant("old-repository", "git", old_ref, scope="repository"),))
+
+    result = json.loads(paths[0].read_text(encoding="utf-8"))
+    assert result["code_commit"] == old_ref
+    assert result["docs_commit"] == old_ref
+
+
 def test_submodule_docs_are_initialized_and_overlaid(tmp_path: Path) -> None:
     module_path = tmp_path / "module"
     module_path.mkdir()
@@ -104,3 +139,25 @@ def test_submodule_docs_are_initialized_and_overlaid(tmp_path: Path) -> None:
         assert (module_workspace / "core.txt").read_text(encoding="utf-8") == "fixed code"
     finally:
         workspace.close()
+
+
+def test_workspace_initializes_codegraph_in_the_worktree(tmp_path: Path, monkeypatch) -> None:
+    commands: list[tuple[list[str], Path]] = []
+
+    class Completed:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def run(command, *, cwd, **kwargs):
+        commands.append((command, cwd))
+        assert kwargs["capture_output"] is True
+        return Completed()
+
+    monkeypatch.setattr(workspace_module.shutil, "which", lambda name: "codegraph.exe")
+    monkeypatch.setattr(workspace_module.subprocess, "run", run)
+    workspace = Workspace(repository=None, root=tmp_path, repo=tmp_path)
+
+    workspace.initialize_codegraph()
+
+    assert commands == [(["codegraph.exe", "init"], tmp_path)]

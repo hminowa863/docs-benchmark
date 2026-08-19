@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
 import tempfile
 import uuid
 from dataclasses import dataclass
@@ -36,3 +37,14 @@ class Workspace:
             self.repository.remove_worktree(self.repo)
         finally:
             shutil.rmtree(self.root, ignore_errors=True)
+
+    def initialize_codegraph(self) -> None:
+        """Build a CodeGraph index for this isolated workspace."""
+        executable = shutil.which("codegraph")
+        if executable is None:
+            raise RuntimeError("CodeGraph executable not found: codegraph")
+        result = subprocess.run([executable, "init"], cwd=self.repo, text=True,
+                                capture_output=True, encoding="utf-8", errors="replace", check=False)
+        if result.returncode:
+            detail = result.stderr.strip() or result.stdout.strip()
+            raise RuntimeError(f"codegraph init failed ({result.returncode}): {detail}")

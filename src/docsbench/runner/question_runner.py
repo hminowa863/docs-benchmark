@@ -8,7 +8,7 @@ from docsbench.config import Question, Target
 from docsbench.grading import grade_answer
 from docsbench.metrics import UsageMetrics, calculate_retrieval
 
-PROMPT_VERSION = "v1"
+PROMPT_VERSION = "v2"
 
 
 def build_prompt(question: Question) -> str:
@@ -16,7 +16,13 @@ def build_prompt(question: Question) -> str:
 
 Answer the following question based only on information available in the repository.
 
-Investigate the repository as needed before answering.
+Be economical: preserve both input tokens and elapsed time while retaining an evidence-based answer.
+
+- Do not run `git status`, `git diff`, `git log`, or broadly enumerate the repository unless the question specifically requires repository history or the working tree state.
+- Make a small, targeted search plan using terminology appropriate to the repository. Prefer a focused filename/content search to exploratory listing.
+- Read only the most relevant files. Combine related reads into one command, and read a relevant section rather than an entire large file where practical.
+- Prefer repository documentation when it answers the question; inspect source code only to resolve missing or conflicting evidence.
+- Follow repository-local instructions (such as AGENTS.md) when they apply.
 
 Question:
 
@@ -41,7 +47,7 @@ def execute_question(agent: AgentAdapter, workspace: Path, target: Target, quest
         "question_id": question.id,
         "category": question.category,
         "agent": {"name": agent.name, "model": result.model, "version": result.agent_version},
-        "usage": UsageMetrics(result.input_tokens, result.output_tokens).as_dict(),
+        "usage": UsageMetrics(result.input_tokens, result.output_tokens, result.cached_input_tokens).as_dict(),
         "retrieval": retrieval.as_dict(), "answer": result.answer,
         "grading": None if grade is None else {"score": grade.score, "max_score": grade.max_score,
                     "normalized": grade.normalized, "detail": grade.detail},

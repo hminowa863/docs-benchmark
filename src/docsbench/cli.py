@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .agents import CodexAdapter, MockAdapter
 from .config import DocsVariant, load_target
-from .reporting import build_summary, render_review, render_summary
+from .reporting import build_summary, render_review, render_summary, render_trace
 from .runner import BenchmarkRunner
 
 
@@ -25,21 +25,32 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--rubric-model")
     run.add_argument("--code", help="override fixed code ref")
     run.add_argument("--docs", nargs="+", help="documentation refs; creates git variants")
+    run.add_argument("--codegraph-init", action="store_true",
+                     help="initialize CodeGraph for every variant, overriding per-variant YAML settings")
     run.add_argument("--keep-workspaces", action="store_true")
     report = subparsers.add_parser("report", help="aggregate saved benchmark results")
     report.add_argument("target")
     report.add_argument("--results-dir", type=Path, default=Path("results"))
+    report.add_argument("--average", action="store_true", help="show mean input tokens and elapsed time instead of medians")
     review = subparsers.add_parser("review", help="show saved answers for manual evaluation")
     review.add_argument("target")
     review.add_argument("--results-dir", type=Path, default=Path("results"))
     review.add_argument("--variant", action="append", dest="variants")
     review.add_argument("--question", action="append", dest="questions")
+    trace = subparsers.add_parser("trace", help="show the ordered retrieval route for saved runs")
+    trace.add_argument("target")
+    trace.add_argument("--results-dir", type=Path, default=Path("results"))
+    trace.add_argument("--variant", action="append", dest="variants")
+    trace.add_argument("--question", action="append", dest="questions")
     args = parser.parse_args(argv)
     if args.command == "report":
-        print(render_summary(args.target, build_summary(args.results_dir, args.target)))
+        print(render_summary(args.target, build_summary(args.results_dir, args.target), args.average))
         return 0
     if args.command == "review":
         print(render_review(args.results_dir, args.target, set(args.variants or []), set(args.questions or [])))
+        return 0
+    if args.command == "trace":
+        print(render_trace(args.results_dir, args.target, set(args.variants or []), set(args.questions or [])))
         return 0
     if args.repeat < 1:
         parser.error("--repeat must be at least 1")
@@ -52,7 +63,8 @@ def main(argv: list[str] | None = None) -> int:
     agent = MockAdapter() if args.agent == "mock" else CodexAdapter(model=args.model, on_progress=progress)
     rubric_judge = CodexAdapter(model=args.rubric_model, on_progress=progress) if args.rubric_agent == "codex" else None
     runner = BenchmarkRunner(target, target_path.with_name("questions.yaml"), args.results_dir, agent,
-                             keep_workspaces=args.keep_workspaces, rubric_judge=rubric_judge, on_progress=progress)
+                             keep_workspaces=args.keep_workspaces, codegraph_init=args.codegraph_init,
+                             rubric_judge=rubric_judge, on_progress=progress)
     paths = runner.run(variants, set(args.questions or []), args.repeat, args.code)
     print(f"Completed {len(paths)} run(s); results: {args.results_dir / target.name / 'runs'}")
     return 0
